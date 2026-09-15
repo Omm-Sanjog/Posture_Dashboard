@@ -718,18 +718,21 @@ window.addEventListener("resize", () => { if (activeDeviceId) drawChart(devices.
 $("btnCalibrate").onclick = async () => {
   const d = devices.find((x) => x.id === activeDeviceId);
   const { error } = await sb.from("devices").update({ pending_calibrate: true }).eq("id", d.id);
-  if (error) alert(error.message);
+  if (error) { console.error("[calibrate] failed:", error); alert(error.message); }
+  else console.log("[calibrate] pending_calibrate set to true for", d.id);
   // overlay itself appears once the device reports cal_active=true, within one check-in cycle
 };
 $("btnZero").onclick = async () => {
   const d = devices.find((x) => x.id === activeDeviceId);
   const { error } = await sb.from("devices").update({ pending_zero: true }).eq("id", d.id);
-  if (error) alert(error.message);
+  if (error) { console.error("[zero] failed:", error); alert(error.message); }
+  else console.log("[zero] pending_zero set to true for", d.id);
 };
 $("btnVibeTest").onclick = async () => {
   const d = devices.find((x) => x.id === activeDeviceId);
   const { error } = await sb.from("devices").update({ pending_vibe_test: true }).eq("id", d.id);
-  if (error) alert(error.message);
+  if (error) { console.error("[vibe_test] failed:", error); alert(error.message); }
+  else console.log("[vibe_test] pending_vibe_test set to true for", d.id);
 };
 $("btnResetSession").onclick = async () => {
   const d = devices.find((x) => x.id === activeDeviceId);
