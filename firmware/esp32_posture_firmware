@@ -49,12 +49,12 @@ const char *SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOi
 // Password for the device's own setup Wi-Fi network (min 8 chars for WPA2).
 const char *SETUP_AP_PASS = "posture123";
 
-#define I2C_SDA   21        // XIAO D4
-#define I2C_SCL   22       // XIAO D5
-#define LED_PIN   15       // XIAO D10 -> your red LED. Change to match wiring.
+#define I2C_SDA   6        // XIAO D4
+#define I2C_SCL   7       // XIAO D5
+#define LED_PIN   10       // XIAO D10 -> your red LED. Change to match wiring.
 #define LED_ON    HIGH     // LOW if the LED is wired to 3V3 through the pin
 
-#define BATT_PIN  34        // XIAO A0 / IO2 -> midpoint of the divider below.
+#define BATT_PIN  2        // XIAO A0 / IO2 -> midpoint of the divider below.
 #define BATT_R1   32000.0f // top resistor: battery+ -> A0
 #define BATT_R2   7500.0f  // bottom resistor: A0 -> GND
 #define BATT_FULL_V   4.20f
@@ -65,7 +65,7 @@ const char *SETUP_AP_PASS = "posture123";
 #define BATT_READ_MS  2000UL
 #define BATT_DEAD_REPEAT_MS 15000UL
 
-#define VIBE_PIN  4       // XIAO D7 / IO20 -> vibration motor, via a transistor/MOSFET
+#define VIBE_PIN  20       // XIAO D7 / IO20 -> vibration motor, via a transistor/MOSFET
                             // NOTE: GPIO20/21 are also UART0 RX/TX on the C3;
                             // move this if the motor never fires.
 #define VIBE_ON       HIGH
