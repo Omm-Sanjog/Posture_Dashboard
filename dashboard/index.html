@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Spine Monitor · Devices</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --paper:#e9edf0; --panel:#f7f9fa; --ink:#15202b; --soft:#5c6b7a;
+  --rule:#c3ccd4; --aligned:#1f6f5c; --slouch:#b4402f; --trace:#4a6d8c;
+  --warn:#b9821f;
+  --sans: ui-sans-serif,"Helvetica Neue",Helvetica,Arial,sans-serif;
+  --mono: ui-monospace,"SF Mono","Roboto Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper); color:var(--ink); font-family:var(--sans);
+  font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased;
+  padding:22px 18px 46px;
+}
+.wrap{max-width:960px;margin:0 auto}
+header{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+  border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:22px}
+h1{font-size:22px;font-weight:650;letter-spacing:-.015em;margin:0}
+.sub{color:var(--soft);font-size:13px}
+.spacer{margin-left:auto}
+button{font:inherit;font-size:14px;padding:9px 16px;border:1px solid var(--ink);
+  background:var(--ink);color:var(--panel);cursor:pointer;border-radius:2px}
+button.ghost{background:transparent;color:var(--ink)}
+button.danger{background:var(--slouch);border-color:var(--slouch);color:#fff}
+button:hover{opacity:.86}
+input{font:inherit;font-size:14px;padding:9px 11px;border:1px solid var(--rule);
+  border-radius:2px;background:#fff;color:var(--ink);width:100%}
+label{font-size:13px;color:var(--soft);display:block;margin:12px 0 5px}
+
+/* ---- auth screen ---- */
+.authBox{max-width:360px;margin:80px auto;background:var(--panel);
+  border:1px solid var(--rule);padding:28px}
+.authBox h2{margin:0 0 4px;font-size:20px}
+.authBox p{color:var(--soft);font-size:13px;margin:0 0 18px}
+.authBox button{width:100%;margin-top:18px}
+.authSwitch{margin-top:14px;font-size:13px;color:var(--soft);text-align:center}
+.authSwitch a{color:var(--trace);cursor:pointer;text-decoration:underline}
+.err{color:var(--slouch);font-size:13px;margin-top:10px;min-height:1em}
+
+/* ---- device grid ---- */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.card{background:var(--panel);border:1px solid var(--rule);padding:16px;cursor:pointer;position:relative}
+.card:hover{border-color:var(--trace)}
+.card h3{margin:0 0 6px;font-size:16px;padding-right:20px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--rule);
+  position:absolute;top:18px;right:16px}
+.dot.on{background:var(--aligned)}
+.dot.slouch{background:var(--slouch)}
+.card .meta{font-size:12.5px;color:var(--soft)}
+.card .row{display:flex;justify-content:space-between;margin-top:8px;font-family:var(--mono);font-size:13px}
+.empty{color:var(--soft);padding:40px 0;text-align:center}
+
+/* ---- modal ---- */
+.overlay{position:fixed;inset:0;background:rgba(21,32,43,.55);
+  display:none;place-items:center;padding:20px;z-index:9}
+.overlay.on{display:grid}
+.modal{background:var(--panel);border:1px solid var(--rule);padding:24px;width:100%;max-width:380px}
+.modal h3{margin:0 0 4px}
+.modal .hint{font-size:12.5px;color:var(--soft);margin:0 0 4px}
+.modal .actions{display:flex;gap:10px;margin-top:20px}
+.modal .actions button{flex:1}
+
+/* ---- detail view ---- */
+.detail .back{margin-bottom:16px}
+.readout{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+  gap:0;border:1px solid var(--rule);background:var(--panel)}
+.readout div{padding:16px;border-left:1px solid var(--rule)}
+.readout div:first-child{border-left:none}
+.readout b{display:block;font-family:var(--mono);font-size:22px;font-weight:500}
+.readout span{font-size:12px;color:var(--soft)}
+.detailActions{margin-top:16px;display:flex;gap:10px}
+.hidden{display:none !important}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ================= AUTH ================= -->
+  <div id="authScreen" class="authBox">
+    <h2 id="authTitle">Log in</h2>
+    <p id="authSub">Access your registered posture monitors.</p>
+    <label>Email</label>
+    <input id="authEmail" type="email" autocomplete="email">
+    <label>Password</label>
+    <input id="authPass" type="password" autocomplete="current-password">
+    <button id="authSubmit">Log in</button>
+    <div class="err" id="authErr"></div>
+    <div class="authSwitch" id="authSwitch">
+      New here? <a id="authToggle">Create an account</a>
+    </div>
+  </div>
+
+  <!-- ================= APP ================= -->
+  <div id="app" class="hidden">
+    <header>
+      <h1>Spine Monitor</h1>
+      <span class="sub" id="whoAmI"></span>
+      <span class="spacer"></span>
+      <button class="ghost" id="btnAdd">+ Add device</button>
+      <button class="ghost" id="btnLogout">Log out</button>
+    </header>
+
+    <div id="listView">
+      <div class="grid" id="deviceGrid"></div>
+      <div class="empty hidden" id="emptyMsg">
+        No devices yet. Flash a device, then click "Add device" and paste in its key.
+      </div>
+    </div>
+
+    <div id="detailView" class="detail hidden">
+      <button class="ghost back" id="btnBack">&larr; All devices</button>
+      <h2 id="dName"></h2>
+      <p class="sub" id="dStatus"></p>
+      <div class="readout">
+        <div><b id="dLean">--</b><span>forward tilt</span></div>
+        <div><b id="dLat">--</b><span>side tilt</span></div>
+        <div><b id="dBatt">--</b><span>battery</span></div>
+        <div><b id="dSeen">--</b><span>last seen</span></div>
+      </div>
+      <div class="detailActions">
+        <button class="ghost" id="btnRename">Rename</button>
+        <button class="danger" id="btnRemove">Remove device</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Add-device modal -->
+<div class="overlay" id="addOverlay">
+  <div class="modal">
+    <h3>Add a device</h3>
+    <p class="hint">Flash the firmware first - on first boot it prints a
+      device key once to the Serial Monitor. Paste it below to claim it.</p>
+    <label>Device name</label>
+    <input id="newName" placeholder="e.g. Desk sensor">
+    <label>Device key</label>
+    <input id="newKey" placeholder="paste the key from Serial Monitor">
+    <div class="err" id="addErr"></div>
+    <div class="actions">
+      <button class="ghost" id="addCancel">Cancel</button>
+      <button id="addConfirm">Add device</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- fill in from your Supabase project (Project Settings > API) ----
+const SUPABASE_URL = "https://gkpqooyaidofmnzehwgu.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdrcHFvb3lhaWRvZm1uemVod2d1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk0OTc0OTUsImV4cCI6MjEwNTA3MzQ5NX0.4vi_AGpwaBJG8vJNH-rmufAG-3eRyRXChmKC6t66OPc";
+// -----------------------------------------------------------------------
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const $ = (id) => document.getElementById(id);
+const ONLINE_WINDOW_MS = 30000; // no heartbeat in this long = offline
+
+let devices = [];
+let pollTimer = null;
+let activeDeviceId = null;
+let isSignup = false;
+
+/* ---------------------------- auth ---------------------------- */
+$("authToggle").onclick = () => {
+  isSignup = !isSignup;
+  $("authTitle").textContent = isSignup ? "Create an account" : "Log in";
+  $("authSub").textContent = isSignup
+    ? "One account, as many devices as you like."
+    : "Access your registered posture monitors.";
+  $("authSubmit").textContent = isSignup ? "Sign up" : "Log in";
+  $("authSwitch").innerHTML = isSignup
+    ? 'Already have an account? <a id="authToggle2">Log in</a>'
+    : 'New here? <a id="authToggle2">Create an account</a>';
+  document.getElementById("authToggle2").onclick = () => $("authToggle").onclick();
+};
+
+$("authSubmit").onclick = async () => {
+  const email = $("authEmail").value.trim();
+  const password = $("authPass").value;
+  $("authErr").textContent = "";
+  if (!email || !password) { $("authErr").textContent = "Enter an email and password."; return; }
+
+  const { error } = isSignup
+    ? await sb.auth.signUp({ email, password })
+    : await sb.auth.signInWithPassword({ email, password });
+
+  if (error) { $("authErr").textContent = error.message; return; }
+  if (isSignup) {
+    $("authErr").style.color = "var(--aligned)";
+    $("authErr").textContent = "Account created - check your email to confirm, then log in.";
+  } else {
+    enterApp();
+  }
+};
+
+$("btnLogout").onclick = async () => {
+  await sb.auth.signOut();
+  clearInterval(pollTimer);
+  $("app").classList.add("hidden");
+  $("authScreen").classList.remove("hidden");
+};
+
+/* ---------------------------- app shell ---------------------------- */
+async function enterApp() {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return;
+  $("whoAmI").textContent = user.email;
+  $("authScreen").classList.add("hidden");
+  $("app").classList.remove("hidden");
+  await refreshDevices();
+  pollTimer = setInterval(refreshDevices, 4000);
+}
+
+async function refreshDevices() {
+  const { data, error } = await sb.from("devices").select("*").order("created_at", { ascending: true });
+  if (error) { console.error(error); return; }
+  devices = data || [];
+  renderGrid();
+  if (activeDeviceId) renderDetail(); // keep detail view live too
+}
+
+function isOnline(d) {
+  if (!d.last_seen) return false;
+  return Date.now() - new Date(d.last_seen).getTime() < ONLINE_WINDOW_MS;
+}
+
+function fmtAgo(ts) {
+  if (!ts) return "never";
+  const s = Math.max(0, Math.round((Date.now() - new Date(ts).getTime()) / 1000));
+  if (s < 60) return s + "s ago";
+  if (s < 3600) return Math.round(s / 60) + "m ago";
+  return Math.round(s / 3600) + "h ago";
+}
+
+function renderGrid() {
+  const grid = $("deviceGrid");
+  grid.innerHTML = "";
+  $("emptyMsg").classList.toggle("hidden", devices.length > 0);
+  devices.forEach((d) => {
+    const online = isOnline(d);
+    const card = document.createElement("div");
+    card.className = "card";
+    card.onclick = () => openDetail(d.id);
+    card.innerHTML = `
+      <div class="dot ${online ? (d.slouching ? "slouch" : "on") : ""}"></div>
+      <h3>${escapeHtml(d.name)}</h3>
+      <div class="meta">${online ? (d.slouching ? "Slouching" : "Online · sitting straight") : "Offline"}</div>
+      <div class="row"><span>lean</span><span>${d.lean != null ? d.lean.toFixed(1) + "°" : "--"}</span></div>
+      <div class="row"><span>battery</span><span>${d.battery_pct != null ? d.battery_pct + "%" : "--"}</span></div>
+      <div class="row"><span>last seen</span><span>${fmtAgo(d.last_seen)}</span></div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function escapeHtml(s) {
+  return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+/* ---------------------------- detail view ---------------------------- */
+function openDetail(id) {
+  activeDeviceId = id;
+  $("listView").classList.add("hidden");
+  $("detailView").classList.remove("hidden");
+  renderDetail();
+}
+$("btnBack").onclick = () => {
+  activeDeviceId = null;
+  $("detailView").classList.add("hidden");
+  $("listView").classList.remove("hidden");
+};
+
+function renderDetail() {
+  const d = devices.find((x) => x.id === activeDeviceId);
+  if (!d) { $("btnBack").onclick(); return; }
+  const online = isOnline(d);
+  $("dName").textContent = d.name;
+  $("dStatus").textContent = online ? (d.slouching ? "Slouching right now" : "Online · sitting straight") : "Offline";
+  $("dLean").textContent = d.lean != null ? d.lean.toFixed(1) + "°" : "--";
+  $("dLat").textContent = d.lat != null ? d.lat.toFixed(1) + "°" : "--";
+  $("dBatt").textContent = d.battery_pct != null ? d.battery_pct + "% · " + (d.battery_v ?? "--") + "V" : "--";
+  $("dSeen").textContent = fmtAgo(d.last_seen);
+}
+
+$("btnRename").onclick = async () => {
+  const d = devices.find((x) => x.id === activeDeviceId);
+  const name = prompt("Rename device", d.name);
+  if (!name) return;
+  const { error } = await sb.from("devices").update({ name }).eq("id", d.id);
+  if (error) alert(error.message); else refreshDevices();
+};
+
+$("btnRemove").onclick = async () => {
+  const d = devices.find((x) => x.id === activeDeviceId);
+  if (!confirm(`Remove "${d.name}"? This can't be undone.`)) return;
+  const { error } = await sb.from("devices").delete().eq("id", d.id);
+  if (error) { alert(error.message); return; }
+  $("btnBack").onclick();
+  refreshDevices();
+};
+
+/* ---------------------------- add device ---------------------------- */
+$("btnAdd").onclick = () => {
+  $("newName").value = ""; $("newKey").value = ""; $("addErr").textContent = "";
+  $("addOverlay").classList.add("on");
+};
+$("addCancel").onclick = () => $("addOverlay").classList.remove("on");
+
+$("addConfirm").onclick = async () => {
+  const name = $("newName").value.trim();
+  const device_key = $("newKey").value.trim();
+  if (!name || !device_key) { $("addErr").textContent = "Fill in both fields."; return; }
+
+  const { data: { user } } = await sb.auth.getUser();
+  const { error } = await sb.from("devices").insert({ name, device_key, owner_id: user.id });
+  if (error) { $("addErr").textContent = error.message; return; }
+
+  $("addOverlay").classList.remove("on");
+  refreshDevices();
+};
+
+/* ---------------------------- boot ---------------------------- */
+(async function boot() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) enterApp();
+})();
+</script>
+</body>
+</html>
