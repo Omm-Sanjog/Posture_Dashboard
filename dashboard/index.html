@@ -114,6 +114,12 @@ label{font-size:13px;color:var(--soft);display:block;margin:12px 0 5px}
 .overlay{position:fixed;inset:0;background:rgba(21,32,43,.55);
   display:none;place-items:center;padding:20px;z-index:9}
 .overlay.on{display:grid}
+.calOverlay{background:#15202b;color:#f7f9fa;text-align:center}
+.calOverlay h3{font-family:var(--serif);font-size:30px;margin:0 0 6px;font-weight:600}
+.calOverlay p{max-width:36ch;margin:0 auto 20px;color:#aeb9c4;font-size:14px}
+.calCount{font-family:var(--mono);font-size:60px;line-height:1}
+.calBar{width:min(360px,80vw);height:4px;background:rgba(255,255,255,.18);margin:18px auto 0}
+.calBar i{display:block;height:100%;background:#7fa8c9;width:0;transition:width .6s linear}
 .modal{background:var(--panel);border:1px solid var(--rule);padding:24px;width:100%;max-width:380px}
 .modal h3{margin:0 0 4px;font-family:var(--serif);font-size:19px;font-weight:600}
 .modal .hint{font-size:12.5px;color:var(--soft);margin:0 0 4px}
@@ -229,6 +235,7 @@ label{font-size:13px;color:var(--soft);display:block;margin:12px 0 5px}
         <div><b id="dSeen">--</b><span>last seen</span></div>
       </div>
       <div class="detailActions">
+        <button id="btnCalibrate">Calibrate</button>
         <button class="ghost" id="btnRename">Rename</button>
         <button class="danger" id="btnRemove">Remove device</button>
       </div>
@@ -251,6 +258,16 @@ label{font-size:13px;color:var(--soft);display:block;margin:12px 0 5px}
       <button class="ghost" id="addCancel">Cancel</button>
       <button id="addConfirm">Add device</button>
     </div>
+  </div>
+</div>
+
+<!-- Calibration overlay (mirrors the device's own former local page) -->
+<div class="overlay" id="calOverlay">
+  <div class="modal calOverlay">
+    <h3 id="calTitle">Calibrating</h3>
+    <p id="calMsg"></p>
+    <div class="calCount" id="calCount">60</div>
+    <div class="calBar"><i id="calBar"></i></div>
   </div>
 </div>
 
@@ -354,7 +371,7 @@ async function enterApp() {
   $("authScreen").classList.add("hidden");
   $("app").classList.remove("hidden");
   await refreshDevices();
-  pollTimer = setInterval(refreshDevices, 4000);
+  pollTimer = setInterval(refreshDevices, 2000);
 }
 
 async function refreshDevices() {
@@ -444,6 +461,7 @@ function openDetail(id) {
 }
 $("btnBack").onclick = () => {
   activeDeviceId = null;
+  $("calOverlay").classList.remove("on");
   $("detailView").classList.add("hidden");
   $("listView").classList.remove("hidden");
 };
@@ -462,6 +480,24 @@ function renderDetail() {
   const color = online ? (d.slouching ? cssVar("--slouch") : cssVar("--aligned")) : cssVar("--trace");
   $("dGaugeNeedle").setAttribute("transform", `rotate(${angle},40,70)`);
   $("dGaugeNeedle").querySelector("line").setAttribute("stroke", color);
+  renderCalOverlay(d);
+}
+
+$("btnCalibrate").onclick = async () => {
+  const d = devices.find((x) => x.id === activeDeviceId);
+  const { error } = await sb.from("devices").update({ pending_calibrate: true }).eq("id", d.id);
+  if (error) alert(error.message);
+  // overlay itself appears once the device reports cal_active=true, within one check-in cycle
+};
+
+function renderCalOverlay(d) {
+  const ov = $("calOverlay");
+  if (!d || !d.cal_active) { ov.classList.remove("on"); return; }
+  ov.classList.add("on");
+  $("calTitle").textContent = d.cal_title || "Calibrating";
+  $("calMsg").textContent = d.cal_msg || "";
+  $("calCount").textContent = d.cal_remain != null ? d.cal_remain : "";
+  $("calBar").style.width = d.cal_remain != null ? (100 - (100 * d.cal_remain / 60)) + "%" : "0%";
 }
 
 $("btnRename").onclick = async () => {
