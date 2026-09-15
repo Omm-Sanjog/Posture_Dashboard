@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Spine Monitor · Devices</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
@@ -12,18 +15,19 @@
   --warn:#b9821f;
   --sans: ui-sans-serif,"Helvetica Neue",Helvetica,Arial,sans-serif;
   --mono: ui-monospace,"SF Mono","Roboto Mono",Menlo,Consolas,monospace;
+  --serif: "Fraunces", ui-serif, Georgia, serif;
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
 body{
   background:var(--paper); color:var(--ink); font-family:var(--sans);
   font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased;
-  padding:22px 18px 46px;
 }
-.wrap{max-width:960px;margin:0 auto}
+.wrap{max-width:1040px;margin:0 auto;padding:22px 22px 60px}
 header{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
-  border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:22px}
-h1{font-size:22px;font-weight:650;letter-spacing:-.015em;margin:0}
+  border-bottom:2px solid var(--ink);padding-bottom:14px;margin-bottom:28px}
+header h1{font-family:var(--serif);font-size:24px;font-weight:600;
+  letter-spacing:-.01em;margin:0}
 .sub{color:var(--soft);font-size:13px}
 .spacer{margin-left:auto}
 button{font:inherit;font-size:14px;padding:9px 16px;border:1px solid var(--ink);
@@ -31,45 +35,71 @@ button{font:inherit;font-size:14px;padding:9px 16px;border:1px solid var(--ink);
 button.ghost{background:transparent;color:var(--ink)}
 button.danger{background:var(--slouch);border-color:var(--slouch);color:#fff}
 button:hover{opacity:.86}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--trace);outline-offset:2px}
 input{font:inherit;font-size:14px;padding:9px 11px;border:1px solid var(--rule);
   border-radius:2px;background:#fff;color:var(--ink);width:100%}
 label{font-size:13px;color:var(--soft);display:block;margin:12px 0 5px}
 
-/* ---- auth screen ---- */
-.authBox{max-width:360px;margin:80px auto;background:var(--panel);
-  border:1px solid var(--rule);padding:28px}
-.authBox h2{margin:0 0 4px;font-size:20px}
-.authBox p{color:var(--soft);font-size:13px;margin:0 0 18px}
+/* ---- auth screen: split panel ---- */
+.authShell{min-height:100vh;display:grid;grid-template-columns:1fr 1fr}
+.authHero{background:var(--ink);color:var(--panel);padding:56px 48px;
+  display:flex;flex-direction:column;justify-content:space-between}
+.authHero .word{font-family:var(--serif);font-size:38px;font-weight:600;
+  letter-spacing:-.015em;line-height:1.15;margin:0}
+.authHero .tag{color:#aeb9c4;font-size:14.5px;max-width:34ch;margin-top:10px}
+.authHero svg{width:100%;max-width:260px;margin:20px 0}
+.authHero .foot{font-size:12.5px;color:#8494a2}
+.authForm{display:flex;align-items:center;justify-content:center;padding:40px 32px}
+.authBox{width:100%;max-width:340px}
+.authBox h2{margin:0 0 4px;font-family:var(--serif);font-size:22px;font-weight:600}
+.authBox p{color:var(--soft);font-size:13px;margin:0 0 20px}
 .authBox button{width:100%;margin-top:18px}
 .authSwitch{margin-top:14px;font-size:13px;color:var(--soft);text-align:center}
 .authSwitch a{color:var(--trace);cursor:pointer;text-decoration:underline}
 .err{color:var(--slouch);font-size:13px;margin-top:10px;min-height:1em}
+@media (max-width:760px){
+  .authShell{grid-template-columns:1fr}
+  .authHero{padding:36px 24px 28px}
+  .authHero svg{max-width:180px;margin:14px 0}
+}
 
 /* ---- device grid ---- */
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
-.card{background:var(--panel);border:1px solid var(--rule);padding:16px;cursor:pointer;position:relative}
-.card:hover{border-color:var(--trace)}
-.card h3{margin:0 0 6px;font-size:16px;padding-right:20px}
-.dot{width:9px;height:9px;border-radius:50%;background:var(--rule);
-  position:absolute;top:18px;right:16px}
-.dot.on{background:var(--aligned)}
-.dot.slouch{background:var(--slouch)}
+.sectionHead{display:flex;align-items:baseline;gap:10px;margin-bottom:14px}
+.sectionHead h2{font-family:var(--serif);font-size:19px;font-weight:600;margin:0}
+.sectionHead .count{color:var(--soft);font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+.card{background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--rule);
+  padding:16px;cursor:pointer;display:flex;gap:12px}
+.card:hover{border-color:var(--trace);border-left-color:var(--trace)}
+.card.on{border-left-color:var(--aligned)}
+.card.slouch{border-left-color:var(--slouch)}
+.card .gaugeWrap{flex:none}
+.card .body{min-width:0;flex:1}
+.card h3{margin:0 0 4px;font-family:var(--serif);font-size:16px;font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card .meta{font-size:12.5px;color:var(--soft)}
-.card .row{display:flex;justify-content:space-between;margin-top:8px;font-family:var(--mono);font-size:13px}
-.empty{color:var(--soft);padding:40px 0;text-align:center}
+.card .row{display:flex;justify-content:space-between;margin-top:7px;font-family:var(--mono);font-size:13px}
+
+.empty{display:flex;flex-direction:column;align-items:center;text-align:center;
+  padding:60px 20px;color:var(--soft)}
+.empty svg{width:96px;margin-bottom:18px}
+.empty p{margin:0 0 20px;max-width:32ch;font-size:14.5px}
+.empty.hidden{display:none}
 
 /* ---- modal ---- */
 .overlay{position:fixed;inset:0;background:rgba(21,32,43,.55);
   display:none;place-items:center;padding:20px;z-index:9}
 .overlay.on{display:grid}
 .modal{background:var(--panel);border:1px solid var(--rule);padding:24px;width:100%;max-width:380px}
-.modal h3{margin:0 0 4px}
+.modal h3{margin:0 0 4px;font-family:var(--serif);font-size:19px;font-weight:600}
 .modal .hint{font-size:12.5px;color:var(--soft);margin:0 0 4px}
 .modal .actions{display:flex;gap:10px;margin-top:20px}
 .modal .actions button{flex:1}
 
 /* ---- detail view ---- */
 .detail .back{margin-bottom:16px}
+.detail h2{font-family:var(--serif);font-size:24px;font-weight:600;margin:0 0 2px}
+.detailTop{display:flex;gap:20px;align-items:center;margin-bottom:18px}
 .readout{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
   gap:0;border:1px solid var(--rule);background:var(--panel)}
 .readout div{padding:16px;border-left:1px solid var(--rule)}
@@ -78,28 +108,48 @@ label{font-size:13px;color:var(--soft);display:block;margin:12px 0 5px}
 .readout span{font-size:12px;color:var(--soft)}
 .detailActions{margin-top:16px;display:flex;gap:10px}
 .hidden{display:none !important}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
-<div class="wrap">
 
   <!-- ================= AUTH ================= -->
-  <div id="authScreen" class="authBox">
-    <h2 id="authTitle">Log in</h2>
-    <p id="authSub">Access your registered posture monitors.</p>
-    <label>Email</label>
-    <input id="authEmail" type="email" autocomplete="email">
-    <label>Password</label>
-    <input id="authPass" type="password" autocomplete="current-password">
-    <button id="authSubmit">Log in</button>
-    <div class="err" id="authErr"></div>
-    <div class="authSwitch" id="authSwitch">
-      New here? <a id="authToggle">Create an account</a>
+  <div id="authScreen" class="authShell">
+    <div class="authHero">
+      <div>
+        <p class="word">Spine<br>Monitor</p>
+        <p class="tag">Every device you've registered, and whether it's
+          watching your posture right now.</p>
+      </div>
+      <svg viewBox="0 0 240 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M10 100 C 60 100, 60 40, 110 40 S 160 90, 210 70"
+          stroke="#4a6d8c" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="10" cy="100" r="3.5" fill="#aeb9c4"/>
+        <circle cx="110" cy="40" r="3.5" fill="#aeb9c4"/>
+        <circle cx="210" cy="70" r="3.5" fill="#b4402f"/>
+      </svg>
+      <p class="foot">one account · any number of devices</p>
+    </div>
+    <div class="authForm">
+      <div class="authBox">
+        <h2 id="authTitle">Log in</h2>
+        <p id="authSub">Access your registered posture monitors.</p>
+        <label>Email</label>
+        <input id="authEmail" type="email" autocomplete="email">
+        <label>Password</label>
+        <input id="authPass" type="password" autocomplete="current-password">
+        <button id="authSubmit">Log in</button>
+        <div class="err" id="authErr"></div>
+        <div class="authSwitch" id="authSwitch">
+          New here? <a id="authToggle">Create an account</a>
+        </div>
+      </div>
     </div>
   </div>
 
   <!-- ================= APP ================= -->
   <div id="app" class="hidden">
+   <div class="wrap">
     <header>
       <h1>Spine Monitor</h1>
       <span class="sub" id="whoAmI"></span>
@@ -109,16 +159,35 @@ label{font-size:13px;color:var(--soft);display:block;margin:12px 0 5px}
     </header>
 
     <div id="listView">
+      <div class="sectionHead">
+        <h2>Devices</h2>
+        <span class="count" id="deviceCount"></span>
+      </div>
       <div class="grid" id="deviceGrid"></div>
       <div class="empty hidden" id="emptyMsg">
-        No devices yet. Flash a device, then click "Add device" and paste in its key.
+        <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M15 100 C 55 100, 55 50, 95 50" stroke="#5c6b7a" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="1 7"/>
+          <circle cx="95" cy="50" r="4" fill="#5c6b7a"/>
+          <circle cx="15" cy="100" r="4" fill="#5c6b7a"/>
+        </svg>
+        <p>No devices yet. Flash a device, then add it here with the key it prints on first boot.</p>
+        <button id="emptyAdd">+ Add your first device</button>
       </div>
     </div>
 
     <div id="detailView" class="detail hidden">
       <button class="ghost back" id="btnBack">&larr; All devices</button>
-      <h2 id="dName"></h2>
-      <p class="sub" id="dStatus"></p>
+      <div class="detailTop">
+        <svg id="dGauge" viewBox="0 0 80 80" width="64" height="64">
+          <line x1="40" y1="70" x2="40" y2="20" stroke="#c3ccd4" stroke-width="2" stroke-dasharray="2 4"/>
+          <g id="dGaugeNeedle"><line x1="40" y1="70" x2="40" y2="20" stroke="#4a6d8c" stroke-width="4" stroke-linecap="round"/></g>
+          <circle cx="40" cy="70" r="4" fill="#15202b"/>
+        </svg>
+        <div>
+          <h2 id="dName"></h2>
+          <p class="sub" id="dStatus"></p>
+        </div>
+      </div>
       <div class="readout">
         <div><b id="dLean">--</b><span>forward tilt</span></div>
         <div><b id="dLat">--</b><span>side tilt</span></div>
@@ -130,9 +199,8 @@ label{font-size:13px;color:var(--soft);display:block;margin:12px 0 5px}
         <button class="danger" id="btnRemove">Remove device</button>
       </div>
     </div>
+   </div>
   </div>
-
-</div>
 
 <!-- Add-device modal -->
 <div class="overlay" id="addOverlay">
@@ -239,22 +307,40 @@ function fmtAgo(ts) {
   return Math.round(s / 3600) + "h ago";
 }
 
+function gaugeSvg(lean, colorVar, size) {
+  const angle = Math.max(-60, Math.min(60, lean || 0));
+  return `<svg viewBox="0 0 60 60" width="${size}" height="${size}">
+    <line x1="30" y1="54" x2="30" y2="14" stroke="#c3ccd4" stroke-width="2" stroke-dasharray="1.5 3.5"/>
+    <g transform="rotate(${angle},30,54)">
+      <line x1="30" y1="54" x2="30" y2="14" stroke="${colorVar}" stroke-width="3.5" stroke-linecap="round"/>
+    </g>
+    <circle cx="30" cy="54" r="3" fill="#15202b"/>
+  </svg>`;
+}
+
 function renderGrid() {
   const grid = $("deviceGrid");
   grid.innerHTML = "";
   $("emptyMsg").classList.toggle("hidden", devices.length > 0);
+  $("deviceCount").textContent = devices.length
+    ? devices.length + (devices.length === 1 ? " device" : " devices")
+    : "";
   devices.forEach((d) => {
     const online = isOnline(d);
+    const statusClass = online ? (d.slouching ? "slouch" : "on") : "";
+    const gaugeColor = online ? (d.slouching ? "#b4402f" : "#1f6f5c") : "#c3ccd4";
     const card = document.createElement("div");
-    card.className = "card";
+    card.className = "card " + statusClass;
     card.onclick = () => openDetail(d.id);
     card.innerHTML = `
-      <div class="dot ${online ? (d.slouching ? "slouch" : "on") : ""}"></div>
-      <h3>${escapeHtml(d.name)}</h3>
-      <div class="meta">${online ? (d.slouching ? "Slouching" : "Online · sitting straight") : "Offline"}</div>
-      <div class="row"><span>lean</span><span>${d.lean != null ? d.lean.toFixed(1) + "°" : "--"}</span></div>
-      <div class="row"><span>battery</span><span>${d.battery_pct != null ? d.battery_pct + "%" : "--"}</span></div>
-      <div class="row"><span>last seen</span><span>${fmtAgo(d.last_seen)}</span></div>
+      <div class="gaugeWrap">${gaugeSvg(d.lean, gaugeColor, 44)}</div>
+      <div class="body">
+        <h3>${escapeHtml(d.name)}</h3>
+        <div class="meta">${online ? (d.slouching ? "Slouching" : "Online · sitting straight") : "Offline"}</div>
+        <div class="row"><span>lean</span><span>${d.lean != null ? d.lean.toFixed(1) + "°" : "--"}</span></div>
+        <div class="row"><span>battery</span><span>${d.battery_pct != null ? d.battery_pct + "%" : "--"}</span></div>
+        <div class="row"><span>last seen</span><span>${fmtAgo(d.last_seen)}</span></div>
+      </div>
     `;
     grid.appendChild(card);
   });
@@ -287,6 +373,10 @@ function renderDetail() {
   $("dLat").textContent = d.lat != null ? d.lat.toFixed(1) + "°" : "--";
   $("dBatt").textContent = d.battery_pct != null ? d.battery_pct + "% · " + (d.battery_v ?? "--") + "V" : "--";
   $("dSeen").textContent = fmtAgo(d.last_seen);
+  const angle = Math.max(-60, Math.min(60, d.lean || 0));
+  const color = online ? (d.slouching ? "#b4402f" : "#1f6f5c") : "#4a6d8c";
+  $("dGaugeNeedle").setAttribute("transform", `rotate(${angle},40,70)`);
+  $("dGaugeNeedle").querySelector("line").setAttribute("stroke", color);
 }
 
 $("btnRename").onclick = async () => {
@@ -307,10 +397,12 @@ $("btnRemove").onclick = async () => {
 };
 
 /* ---------------------------- add device ---------------------------- */
-$("btnAdd").onclick = () => {
+$("btnAdd").onclick = openAddModal;
+$("emptyAdd").onclick = openAddModal;
+function openAddModal() {
   $("newName").value = ""; $("newKey").value = ""; $("addErr").textContent = "";
   $("addOverlay").classList.add("on");
-};
+}
 $("addCancel").onclick = () => $("addOverlay").classList.remove("on");
 
 $("addConfirm").onclick = async () => {
