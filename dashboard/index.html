@@ -59,6 +59,9 @@ button{font:inherit;font-size:14px;padding:9px 16px;border:1px solid var(--ink);
 button.ghost{background:transparent;color:var(--ink)}
 button.danger{background:var(--slouch);border-color:var(--slouch);color:#fff}
 button:hover{opacity:.86}
+button:disabled{cursor:default;opacity:.65}
+@keyframes btnPulse{0%{transform:scale(1)}40%{transform:scale(.96)}100%{transform:scale(1)}}
+button.pulsing{animation:btnPulse .35s ease}
 button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--trace);outline-offset:2px}
 input{font:inherit;font-size:14px;padding:9px 11px;border:1px solid var(--rule);
   border-radius:2px;background:var(--field);color:var(--ink);width:100%}
@@ -498,7 +501,7 @@ async function enterApp() {
   $("authScreen").classList.add("hidden");
   $("app").classList.remove("hidden");
   await refreshDevices();
-  pollTimer = setInterval(refreshDevices, 2000);
+  pollTimer = setInterval(refreshDevices, 1000);
 }
 
 async function refreshDevices() {
@@ -715,31 +718,54 @@ function drawChart(thr) {
 }
 window.addEventListener("resize", () => { if (activeDeviceId) drawChart(devices.find(x=>x.id===activeDeviceId)?.thr); });
 
-$("btnCalibrate").onclick = async () => {
+// Gives instant feedback on click: pulses + disables the button, shows
+// "Sending..." then "Sent" (or "Failed" on error) before reverting -
+// so pressing a button always visibly does something, even before the
+// device picks the command up a second or two later.
+async function withFeedback(btn, task) {
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.classList.add("pulsing");
+  btn.textContent = "Sending\u2026";
+  setTimeout(() => btn.classList.remove("pulsing"), 350);
+  try {
+    await task();
+    btn.textContent = "\u2713 Sent";
+  } catch (e) {
+    btn.textContent = "\u2717 Failed";
+    console.error(e);
+  } finally {
+    setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 900);
+  }
+}
+
+$("btnCalibrate").onclick = () => withFeedback($("btnCalibrate"), async () => {
   const d = devices.find((x) => x.id === activeDeviceId);
   const { error } = await sb.from("devices").update({ pending_calibrate: true }).eq("id", d.id);
-  if (error) { console.error("[calibrate] failed:", error); alert(error.message); }
-  else console.log("[calibrate] pending_calibrate set to true for", d.id);
+  if (error) { console.error("[calibrate] failed:", error); throw error; }
+  console.log("[calibrate] pending_calibrate set to true for", d.id);
   // overlay itself appears once the device reports cal_active=true, within one check-in cycle
-};
-$("btnZero").onclick = async () => {
+});
+$("btnZero").onclick = () => withFeedback($("btnZero"), async () => {
   const d = devices.find((x) => x.id === activeDeviceId);
   const { error } = await sb.from("devices").update({ pending_zero: true }).eq("id", d.id);
-  if (error) { console.error("[zero] failed:", error); alert(error.message); }
-  else console.log("[zero] pending_zero set to true for", d.id);
-};
-$("btnVibeTest").onclick = async () => {
+  if (error) { console.error("[zero] failed:", error); throw error; }
+  console.log("[zero] pending_zero set to true for", d.id);
+});
+$("btnVibeTest").onclick = () => withFeedback($("btnVibeTest"), async () => {
   const d = devices.find((x) => x.id === activeDeviceId);
   const { error } = await sb.from("devices").update({ pending_vibe_test: true }).eq("id", d.id);
-  if (error) { console.error("[vibe_test] failed:", error); alert(error.message); }
-  else console.log("[vibe_test] pending_vibe_test set to true for", d.id);
-};
-$("btnResetSession").onclick = async () => {
-  const d = devices.find((x) => x.id === activeDeviceId);
+  if (error) { console.error("[vibe_test] failed:", error); throw error; }
+  console.log("[vibe_test] pending_vibe_test set to true for", d.id);
+});
+$("btnResetSession").onclick = () => {
   if (!confirm("Clear this device's session stats (time straight, slouches caught, etc.)?")) return;
-  const { error } = await sb.from("devices").update({ pending_reset: true }).eq("id", d.id);
-  if (error) alert(error.message);
-  chartHist = [];
+  withFeedback($("btnResetSession"), async () => {
+    const d = devices.find((x) => x.id === activeDeviceId);
+    const { error } = await sb.from("devices").update({ pending_reset: true }).eq("id", d.id);
+    if (error) throw error;
+    chartHist = [];
+  });
 };
 
 $("ctlSens").oninput = (e) => { $("ctlSensVal").textContent = e.target.value; };
