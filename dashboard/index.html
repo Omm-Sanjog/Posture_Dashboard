@@ -27,13 +27,12 @@ body{
   font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased;
   transition:background .2s,color .2s;
   background-image:
-    linear-gradient(var(--rule) 1px, transparent 1px),
-    linear-gradient(90deg, var(--rule) 1px, transparent 1px);
+    linear-gradient(color-mix(in srgb, var(--rule) 45%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--rule) 45%, transparent) 1px, transparent 1px);
   background-size:34px 34px;
   background-attachment:fixed;
   background-position:center;
 }
-:root[data-theme="light"] body{opacity:1}
 body::before{content:"";position:fixed;inset:0;background:
   radial-gradient(ellipse 900px 500px at 15% -5%, color-mix(in srgb, var(--aligned) 10%, transparent), transparent 60%);
   pointer-events:none;z-index:0}
@@ -200,11 +199,11 @@ button.pulsing{animation:btnPulse .3s ease}
       <button class="primary" id="btnAdd">Add device</button>
     </header>
 
-    <div class="helpBanner" id="helpBanner">
+    <div class="helpBanner hidden" id="helpBanner">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 2 21h20L12 3Z" stroke-linejoin="round"/><path d="M12 10v5M12 18h.01" stroke-linecap="round"/></svg>
       <div>
-        <b>Can't reach a device?</b>
-        This page talks directly to each device over Wi-Fi, so your phone or laptop needs to be on the <b>same network</b>. If it's on and connected but still shows offline, your browser may be blocking the connection because this page loads over HTTPS and the device only speaks plain HTTP. Fix: click the padlock in your address bar, open site settings, set <b>Insecure content</b> to <b>Allow</b>, then reload. Or open <code>http://&lt;device&gt;.local</code> directly in a new tab, which always works.
+        <b>Open the device's own address instead</b>
+        You're on the secure (https) copy of this page. Browsers block it from talking to a device on your Wi-Fi, and iPhone has no setting to override that. While on the same Wi-Fi, open <code>http://spine-xxxx.local</code> (or the device's IP address) in your browser. The device serves this same dashboard itself.
       </div>
       <button class="closeX" id="helpClose" title="Dismiss">&times;</button>
     </div>
@@ -256,6 +255,7 @@ button.pulsing{animation:btnPulse .3s ease}
         <div><b id="dBatt">--</b><span>battery</span></div>
         <div><b id="dRssi">--</b><span>signal</span></div>
         <div><b id="dSeen">--</b><span>last response</span></div>
+        <div><b id="dClock">--</b><span>device clock</span></div>
       </div>
 
       <div class="section">
@@ -362,6 +362,7 @@ const POLL_MS = 1500;
 const CHART_WINDOW_MS = 5 * 60000;
 const STORE_KEY = "spineMonitorDevices";
 let chartHist = [];
+let lastChartStamp = 0;
 let devices = [];
 let liveData = {};
 let activeDeviceId = null;
@@ -399,7 +400,11 @@ applyTheme(currentTheme());
 $("themeBtnApp").onclick = toggleTheme;
 
 /* ---------------------------- help banner ---------------------------- */
-try { if (localStorage.getItem("hideHelpBanner") === "1") $("helpBanner").classList.add("hidden"); } catch (e) {}
+if (location.protocol === "https:") {
+  let hid = false;
+  try { hid = localStorage.getItem("hideHelpBanner") === "1"; } catch (e) {}
+  if (!hid) $("helpBanner").classList.remove("hidden");
+}
 $("helpClose").onclick = () => {
   $("helpBanner").classList.add("hidden");
   try { localStorage.setItem("hideHelpBanner", "1"); } catch (e) {}
@@ -414,6 +419,16 @@ function saveDevices() { try { localStorage.setItem(STORE_KEY, JSON.stringify(de
 function normalizeHost(h) { return h.trim().replace(/^https?:\/\//i, "").replace(/\/$/, ""); }
 
 /* ---------------------------- polling ---------------------------- */
+let polling = false;
+const timeSyncAt = {};
+// Hands the phone's current time to a device that has no clock of its own.
+function maybeSyncTime(d, data) {
+  if (timeSyncAt[d.id] && Date.now() - timeSyncAt[d.id] < 60000) return;
+  const drift = data.time_synced ? Math.abs(data.device_time * 1000 - Date.now()) : Infinity;
+  if (drift < 5000) return;
+  timeSyncAt[d.id] = Date.now();
+  postJson(d.host, "/api/time", { epoch: Math.floor(Date.now() / 1000), tz: -new Date().getTimezoneOffset() }).catch(() => {});
+}
 async function pollOne(d) {
   const base = "http://" + d.host;
   try {
@@ -424,13 +439,16 @@ async function pollOne(d) {
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     liveData[d.id] = { ...data, lastOk: Date.now(), errored: false };
+    maybeSyncTime(d, data);
   } catch (e) {
     const prev = liveData[d.id];
     liveData[d.id] = { ...(prev || {}), lastOk: prev ? prev.lastOk : 0, errored: true };
   }
 }
 async function pollAll() {
-  await Promise.all(devices.map(pollOne));
+  if (polling) return;
+  polling = true;
+  try { await Promise.all(devices.map(pollOne)); } finally { polling = false; }
   renderGrid();
   if (activeDeviceId) renderDetail();
 }
@@ -512,9 +530,9 @@ function battIcon(pct) {
   </svg>${pct != null ? pct + "%" : "--"}</span>`;
 }
 
+const cardEls = {};
 function renderGrid() {
   const grid = $("deviceGrid");
-  grid.innerHTML = "";
   $("emptyMsg").classList.toggle("hidden", devices.length > 0);
   $("deviceCount").textContent = devices.length ? devices.length + (devices.length === 1 ? " device" : " devices") : "";
   $("summaryBar").classList.toggle("hidden", devices.length === 0);
@@ -527,35 +545,43 @@ function renderGrid() {
   $("sumSlouch").textContent = slouchCount;
   $("sumErr").textContent = errCount;
 
+  Object.keys(cardEls).forEach((id) => {
+    if (!devices.some((d) => d.id === id)) { cardEls[id].remove(); delete cardEls[id]; delete lastStatusClass[id]; }
+  });
+
   devices.forEach((d) => {
     const online = isOnline(d.id);
     const live = liveData[d.id] || {};
     const statusClass = online ? (live.slouching ? "slouch" : "on") : "";
     const color = online ? (live.slouching ? cssVar("--slouch") : cssVar("--aligned")) : cssVar("--rule");
-    const card = document.createElement("div");
+    let card = cardEls[d.id];
+    if (!card) {
+      card = document.createElement("div");
+      card.onclick = () => openDetail(d.id);
+      cardEls[d.id] = card;
+      grid.appendChild(card);
+    }
     card.className = "card " + statusClass;
-    card.onclick = () => openDetail(d.id);
     const warnIcon = deviceNeedsAttention(d.id)
       ? `<svg class="errFlag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 2 21h20L12 3Z" stroke-linejoin="round"/><path d="M12 10v5M12 18h.01" stroke-linecap="round"/></svg>`
       : "";
-    card.innerHTML = `
+    const html = `
       ${warnIcon}
       <div class="figWrap">${spineFigure(live.lean, color, { w: 40, h: 68, segs: 6 })}</div>
       <div class="body">
         <h3>${escapeHtml(d.name)}</h3>
         <div class="meta">${online ? (live.slouching ? "Slouching" : "Sitting straight") : "Offline"}</div>
         <div class="figures">
-          <div><b>${live.lean != null ? live.lean.toFixed(1) + "°" : "--"}</b><span>lean</span></div>
+          <div><b>${live.lean != null ? live.lean.toFixed(1) + "\u00B0" : "--"}</b><span>lean</span></div>
           <div><b>${battIcon(live.battery_pct)}</b><span>battery</span></div>
         </div>
-      </div>
-    `;
+      </div>`;
+    if (card._html !== html) { card.innerHTML = html; card._html = html; }
     if (lastStatusClass[d.id] !== undefined && lastStatusClass[d.id] !== statusClass) {
       card.style.setProperty("--pulse-color", color);
-      card.classList.add("pulseOnce");
+      card.classList.remove("pulseOnce"); void card.offsetWidth; card.classList.add("pulseOnce");
     }
     lastStatusClass[d.id] = statusClass;
-    grid.appendChild(card);
   });
 }
 
@@ -563,6 +589,7 @@ function renderGrid() {
 function openDetail(id) {
   activeDeviceId = id;
   chartHist = [];
+  lastChartStamp = 0;
   $("listView").classList.add("hidden");
   $("detailView").classList.remove("hidden");
   const live = liveData[id];
@@ -596,6 +623,9 @@ function renderDetail() {
   $("dBatt").innerHTML = battIcon(live.battery_pct) + (live.battery_v != null ? ` <span style="color:var(--soft);font-size:12px">(${live.battery_v}V)</span>` : "");
   $("dRssi").textContent = live.rssi != null ? live.rssi + " dBm" : "--";
   $("dSeen").textContent = live.lastOk ? Math.max(0, Math.round((Date.now() - live.lastOk) / 1000)) + "s ago" : "never";
+  $("dClock").textContent = live.time_synced
+    ? new Date(live.device_time * 1000 + (Date.now() - live.lastOk)).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : "not set";
 
   const color = online ? (live.slouching ? cssVar("--slouch") : cssVar("--aligned")) : cssVar("--soft");
   $("dFigWrap").innerHTML = spineFigure(live.lean, color, { w: 60, h: 100, segs: 7 });
@@ -604,7 +634,7 @@ function renderDetail() {
   if (!online) {
     banner.className = "banner error";
     banner.textContent = live.errored
-      ? "Can't reach this device - check it's powered on and on the same Wi-Fi, or see the note above about HTTPS/mixed-content blocking."
+      ? "Can't reach this device. Check that it's powered on and your phone is on the same Wi-Fi."
       : "Offline - no response yet.";
   } else if (live.sensor_ok === false) {
     banner.className = "banner error"; banner.textContent = "Sensor not responding on the device - check MPU6050 wiring/power.";
@@ -622,7 +652,8 @@ function renderDetail() {
   $("sLongest").textContent = fmtDur(live.longest_slouch_ms);
   $("sSess").textContent = fmtDur(live.sess_ms);
 
-  if (online) {
+  if (online && live.lastOk !== lastChartStamp) {
+    lastChartStamp = live.lastOk;
     chartHist.push({ t: Date.now(), lean: live.lean ?? 0, over: !!live.slouching });
     chartHist = chartHist.filter((p) => Date.now() - p.t <= CHART_WINDOW_MS);
   }
@@ -774,6 +805,11 @@ $("addConfirm").onclick = () => {
 
 /* ---------------------------- boot ---------------------------- */
 loadDevices();
+// When the device itself served this page (plain http), add it automatically.
+if (location.protocol === "http:" && location.host && devices.length === 0) {
+  devices.push({ id: "self", name: "My Spine Monitor", host: location.host });
+  saveDevices();
+}
 renderGrid();
 startPolling();
 </script>
